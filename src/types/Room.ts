@@ -9,7 +9,7 @@ export interface Player {
 }
 
 export interface Team {
-	id: string;
+	id: number;
 	players: Player[];
 }
 
@@ -21,4 +21,9 @@ export interface Room {
 	playingTeam?: Team;
 	declarer?: Player;
 	dummy?: Player;
+}
+
+export interface ConnectionPayload {
+	room: Room;
+	player: Player;
 }

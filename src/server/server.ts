@@ -1,8 +1,9 @@
-import type { Room } from "@/types/Room";
+import type { ConnectionPayload, Room } from "@/types/Room";
 import { Server, Socket }  from "socket.io";
 import type { Socket as ClientSocket } from "socket.io-client";
+import { v4 } from "uuid";
 
-const rooms: Room[] = [];
+let rooms: Room[] = [];
 
 export async function waitFor(socket: ClientSocket, event: string) {
 	return new Promise<any>((resolve) => {
@@ -12,9 +13,21 @@ export async function waitFor(socket: ClientSocket, event: string) {
 
 export function handleSocketEvents(io: Server, socket: Socket) {
 	const socketEvents: Record<string, (data: any) => void> = {
-		"create-room": (data) => {
+		"create-room": (data: Room) => {
 			rooms.push(data);
 			socket.emit("room-created", data);
+		},
+		"delete-room": (data: Room) => {
+			rooms = rooms.filter((r: Room) => r.id !== data.id);
+			socket.emit("room-deleted", data);
+		},
+		"connect-to-room": (data: ConnectionPayload) => {
+			rooms[rooms.findIndex((r: Room) => r.id === data.room.id)] = data.room;
+			socket.emit("connected-to-room", data);
+		},
+		"disconnect-from-room": (data: ConnectionPayload) => {
+			rooms[rooms.findIndex((r: Room) => r.id === data.room.id)] = data.room;
+			socket.emit("disconnected-from-room", data);
 		}
 	};
 

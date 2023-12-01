@@ -16,6 +16,7 @@
     "pinia": "^2.1.7",
     "socket.io": "^4.7.2",
     "socket.io-client": "^4.7.2",
+    "unique-username-generator": "^1.2.0",
     "uuid": "^9.0.1",
     "vue": "^3.3.4"
   },
