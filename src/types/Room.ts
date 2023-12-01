@@ -21,6 +21,7 @@ export interface Room {
 	playingTeam?: Team;
 	declarer?: Player;
 	dummy?: Player;
+	handsDealt: boolean;
 }
 
 export interface ConnectionPayload {

@@ -49,7 +49,7 @@ export const useRoomsStore = defineStore("rooms", {
 
     createRoom(id: string, player: Player) {
       this.player = player;
-      const room: Room = { id, teams: [{ id: 0, players: [player] }] };
+      const room: Room = { id, teams: [{ id: 0, players: [player] }], handsDealt: false };
       this.curRoom = room;
       socket.emit("create-room", room);
     },
