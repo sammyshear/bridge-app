@@ -1,4 +1,4 @@
-import type { Bid, PlayingCard, TrumpSuit } from "@/types/CardTypes";
+import type { Bid, PlayedCard, PlayingCard, TrumpSuit } from "@/types/CardTypes";
 
 export interface Player {
 	roomId: string;
@@ -11,6 +11,13 @@ export interface Player {
 export interface Team {
 	id: number;
 	players: Player[];
+	tricksWon?: number;
+	score?: Score;
+}
+
+export interface Score {
+	aboveLine: number;
+	belowLine: number;
 }
 
 export interface Room {
@@ -18,6 +25,7 @@ export interface Room {
 	teams: Team[];
 	currentTrump?: TrumpSuit;
 	currentBid?: Bid;
+	currentTrick?: PlayedCard[];
 	playingTeam?: Team;
 	declarer?: Player;
 	dummy?: Player;

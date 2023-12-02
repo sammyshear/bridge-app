@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { v4 } from "uuid";
 import type { ConnectionPayload, Player, Room } from "@/types/Room";
 import { generateUsername } from "unique-username-generator";
+import type { BidPayload, PlayedCard, PlayingCard, Trick } from "@/types/CardTypes";
 
 describe("socket.io connection tests", () => {
 	let io: Server,
@@ -113,10 +114,10 @@ describe("socket.io game logic tests", () => {
 		io = response.io;
 		serverSocket = response.serverSocket;
 
-		clientSocket = ioc("http://localhost:3000");
-		clientSocket2 = ioc("http://localhost:3000");
-		clientSocket3 = ioc("http://localhost:3000");
-		clientSocket4 = ioc("http://localhost:3000");
+		clientSocket = ioc("http://localhost:3000", { multiplex: false });
+		clientSocket2 = ioc("http://localhost:3000", { multiplex: false });
+		clientSocket3 = ioc("http://localhost:3000", { multiplex: false });
+		clientSocket4 = ioc("http://localhost:3000", { multiplex: false });
 		await waitFor(clientSocket, "connect");
 		await waitFor(clientSocket2, "connect");
 		await waitFor(clientSocket3, "connect");
@@ -176,10 +177,10 @@ describe("socket.io game logic tests", () => {
 
 	afterAll(() => {
 		io.close();
-		clientSocket.close();
-		clientSocket2.close();
-		clientSocket3.close();
-		clientSocket4.close();
+		clientSocket.disconnect();
+		clientSocket2.disconnect();
+		clientSocket3.disconnect();
+		clientSocket4.disconnect();
 	});
 
 	it("should deal hands only once", async () => {
@@ -203,9 +204,104 @@ describe("socket.io game logic tests", () => {
 		expect(res4.id).toBe(room.id);
 		room = res4;
 
-
 		expect(res1).toStrictEqual(res2);
 		expect(res2).toStrictEqual(res3);
 		expect(res3).toStrictEqual(res4);
+	});
+
+	it("should bid", async () => {
+		const bidPayload: BidPayload = { room, player: player1, bid: { suit: "Spades", num: 1 } };
+
+		clientSocket.emit("process-bid", bidPayload);
+		const res1 = await waitFor(clientSocket, "bid-processed");
+		expect(res1.currentBid).toStrictEqual(bidPayload.bid);
+		room = res1;
+
+		// client 3 will be left of client 1 at the table
+		const passPayload: BidPayload = { room, player: player3, bid: "Pass" };
+		clientSocket3.emit("process-bid", passPayload);
+		const res2 = await waitFor(clientSocket, "bid-processed");
+		expect(res2.currentBid).toStrictEqual(res1.currentBid);
+		room = res2;
+
+		const bidPayload2: BidPayload = { room, player: player2, bid: { suit: "Spades", num: 2 } };
+		clientSocket2.emit("process-bid", bidPayload2);
+		const res3 = await waitFor(clientSocket, "bid-processed");
+		expect(res3.currentBid).toStrictEqual(bidPayload2.bid);
+		room = res3;
+
+		passPayload.room = room;
+		passPayload.player = player4;
+		clientSocket4.emit("process-bid", passPayload);
+		const res4 = await waitFor(clientSocket, "bid-processed");
+		expect(res4.currentBid).toStrictEqual(res3.currentBid);
+		room = res4;
+
+		clientSocket.emit("finalize-bid", room);
+
+		const promises = [
+			waitFor(clientSocket, "bid-finalized"),
+			waitFor(clientSocket2, "bid-finalized"),
+			waitFor(clientSocket3, "bid-finalized"),
+			waitFor(clientSocket4, "bid-finalized")
+		];
+
+		const responses = await Promise.all(promises);
+		responses.forEach((res: Room) => {
+			expect(res.currentBid).toStrictEqual(bidPayload2.bid);
+		});
+	});
+
+	it("should play a trick and calculate a winner", async () => {
+		const bidPayload: BidPayload = { room, player: player1, bid: { suit: "Spades", num: 1 } };
+
+		clientSocket.emit("process-bid", bidPayload);
+		room = await waitFor(clientSocket, "bid-processed");
+
+		// client 3 will be left of client 1 at the table
+		const passPayload: BidPayload = { room, player: player3, bid: "Pass" };
+		clientSocket3.emit("process-bid", passPayload);
+		room = await waitFor(clientSocket, "bid-processed");
+
+		const bidPayload2: BidPayload = { room, player: player2, bid: { suit: "Spades", num: 2 } };
+		clientSocket2.emit("process-bid", bidPayload2);
+		room = await waitFor(clientSocket, "bid-processed");
+
+		passPayload.room = room;
+		passPayload.player = player4;
+		clientSocket4.emit("process-bid", passPayload);
+		room = await waitFor(clientSocket, "bid-processed");
+
+		clientSocket.emit("finalize-bid", room);
+
+		const card1: PlayedCard = { card: { num: 14, suit: "Spades", name: "Ace" }, player: player1 };
+		const card2: PlayedCard = { card: { num: 2, suit: "Spades", name: 2 }, player: player2 };
+		const card3: PlayedCard = { card: { num: 7, suit: "Spades", name: 7 }, player: player3 };
+		const card4: PlayedCard = { card: { num: 3, suit: "Spades", name: 3 }, player: player4 };
+
+		clientSocket.emit("play-card", card1);	
+		const res1: Room = await waitFor(clientSocket, "played-card");
+		expect(res1.currentTrick![0]).toStrictEqual(card1);
+		room = res1;
+
+		clientSocket2.emit("play-card", card2);
+		const res2: Room = await waitFor(clientSocket, "played-card");
+		expect(res2.currentTrick![1]).toStrictEqual(card2);
+	
+		clientSocket3.emit("play-card", card3);
+		const res3: Room = await waitFor(clientSocket, "played-card");
+		expect(res3.currentTrick![2]).toStrictEqual(card3);
+		room = res3;
+
+		clientSocket4.emit("play-card", card4);
+		const res4: Room = await waitFor(clientSocket, "played-card");
+		expect(res4.currentTrick![3]).toStrictEqual(card4);
+		room = res4;
+
+		clientSocket.emit("calculate-trick-winner", room);
+		const res5: Trick = await waitFor(clientSocket, "calculated-trick-winner");
+		expect(res5.trick).toStrictEqual(room.currentTrick);
+		expect(res5.winner).toStrictEqual(player1);
+		expect(res5.room.id).toBe(room.id);
 	});
 });

@@ -1,3 +1,5 @@
+import type { Player, Room } from "./Room";
+
 export interface PlayingCard {
 	suit: Suit;
 	name: number | Facecard;
@@ -10,6 +12,23 @@ export type TrumpSuit = Suit | "NoTrump";
 export interface Bid {
 	suit: TrumpSuit;
 	num: number;
+}
+
+export interface BidPayload {
+	bid: Bid | "Pass";
+	player: Player;
+	room: Room;
+}
+
+export interface PlayedCard {
+	card: PlayingCard;
+	player: Player;
+}
+
+export interface Trick {
+	trick: PlayedCard[];
+	room: Room;
+	winner: Player;
 }
 
 export const deck: PlayingCard[] = [
