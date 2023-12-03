@@ -154,7 +154,6 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 			io.to(data.id).emit("calculated-trick-winner", trick);
 		},
 		"end-contract": (data: Room) => {
-			console.log(data);
 			if (data.teams[data.declarer!.teamIndex].score === undefined) {
 				data.teams[data.declarer!.teamIndex].score = { belowLine: 0, aboveLine: 0 };
 			}
@@ -212,11 +211,48 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 				data.teams[data.declarer!.teamIndex].score!.belowLine += addToBelow;
 				data.teams[data.declarer!.teamIndex].score!.aboveLine += addToAbove;
 			} else {
-				console.log(data.teams[data.declarer!.teamIndex === 0 ? 1 : 0].score);
 				data.teams[data.declarer!.teamIndex === 0 ? 1 : 0].score!.aboveLine += 100;
 			}
 
 			io.to(data.id).emit("ended-contract", data);
+		},
+		"check-game": (data: Room) => {
+			if (data.gameIndex === undefined) {
+				data.gameIndex = 0;
+			}
+			if (data.rubberIndex === undefined) {
+				data.rubberIndex = 0;
+			}
+			if (data.teams[0].gamesWon === undefined) {
+				data.teams[0].gamesWon = 0;
+			}
+			if (data.teams[1].gamesWon === undefined) {
+				data.teams[1].gamesWon = 0;
+			}
+
+			if (data.teams[0].score!.belowLine >= 100) {
+				data.gameIndex++;
+				data.teams[0].gamesWon++;
+				data.teams[0].score!.aboveLine += data.teams[0].score!.belowLine;
+				data.teams[0].score!.belowLine = 0;
+				data.teams[1].score!.aboveLine += data.teams[1].score!.belowLine;
+				data.teams[1].score!.belowLine = 0;
+			} else if (data.teams[1].score!.belowLine >= 100) {
+				data.gameIndex++;
+				data.teams[1].gamesWon++;
+				data.teams[1].score!.aboveLine += data.teams[1].score!.belowLine;
+				data.teams[1].score!.belowLine = 0;
+				data.teams[0].score!.aboveLine += data.teams[0].score!.belowLine;
+				data.teams[0].score!.belowLine = 0;
+			}
+
+			io.to(data.id).emit("game-checked", data);
+		},
+		"end-rubber": (data: Room) => {	
+			if (data.teams[0].gamesWon! === 2 || data.teams[1].gamesWon! === 2) {
+				data.rubberIndex!++;
+				io.to(data.id).emit("rubber-ended", data);
+			}
 		}
 	};
 

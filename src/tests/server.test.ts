@@ -364,7 +364,7 @@ describe("socket.io game logic tests", () => {
 			{ suit: "Clubs", num: 9, name: 9 } as PlayingCard,
 			{ suit: "Clubs", num: 5, name: 5 } as PlayingCard,
 			{ suit: "Diamonds", num: 2, name: 2 } as PlayingCard,
-			{ suit: "Diamonds", num: 11, name: "Jack", points: 1 } as PlayingCard,
+			{ suit: "Diamonds", num: 11, name: "Jack", points: 1 } as PlayingCard
 		];
 
 		player3.hand = [
@@ -413,7 +413,6 @@ describe("socket.io game logic tests", () => {
 			room = await waitFor(clientSocket, "played-card");
 			clientSocket4.emit("play-card", card4);
 			room = await waitFor(clientSocket, "played-card");
-
 
 			clientSocket.emit("calculate-trick-winner", room);
 			const trick: Trick = await waitFor(clientSocket, "calculated-trick-winner");
@@ -485,7 +484,7 @@ describe("socket.io game logic tests", () => {
 			{ suit: "Clubs", num: 9, name: 9 } as PlayingCard,
 			{ suit: "Clubs", num: 5, name: 5 } as PlayingCard,
 			{ suit: "Diamonds", num: 2, name: 2 } as PlayingCard,
-			{ suit: "Diamonds", num: 11, name: "Jack", points: 1 } as PlayingCard,
+			{ suit: "Diamonds", num: 11, name: "Jack", points: 1 } as PlayingCard
 		];
 
 		player3.hand = [
@@ -519,7 +518,6 @@ describe("socket.io game logic tests", () => {
 			{ suit: "Clubs", num: 4, name: 4 } as PlayingCard,
 			{ suit: "Clubs", num: 6, name: 6 } as PlayingCard
 		];
-		console.log(player1.name, player2.name, player3.name, player4.name);
 
 		await asyncForEach<PlayingCard>(player1.hand, async (_: PlayingCard, i: number) => {
 			const card1: PlayedCard = { player: player1, card: player1.hand[i] };
@@ -536,11 +534,9 @@ describe("socket.io game logic tests", () => {
 			clientSocket4.emit("play-card", card4);
 			room = await waitFor(clientSocket, "played-card");
 
-
 			clientSocket.emit("calculate-trick-winner", room);
 			const trick: Trick = await waitFor(clientSocket, "calculated-trick-winner");
 			room = trick.room;
-			console.log(trick.winner.name);
 		});
 
 		clientSocket.emit("end-contract", room);
@@ -551,5 +547,127 @@ describe("socket.io game logic tests", () => {
 		expect(res.teams[0].score?.aboveLine).toBe(100);
 		expect(res.teams[1].score?.aboveLine).toBe(0);
 		expect(res.teams[1].score?.belowLine).toBe(0);
+	});
+});
+
+describe("rubber testing", () => {
+	let io: Server,
+		clientSocket: ClientSocket,
+		clientSocket2: ClientSocket,
+		clientSocket3: ClientSocket,
+		clientSocket4: ClientSocket,
+		serverSocket: ServerSocket | undefined;
+
+	let player1: Player, player2: Player, player3: Player, player4: Player, room: Room;
+
+	beforeAll(async () => {
+		const response = await setupServer();
+		io = response.io;
+		serverSocket = response.serverSocket;
+
+		clientSocket = ioc("http://localhost:3000", { multiplex: false });
+		clientSocket2 = ioc("http://localhost:3000", { multiplex: false });
+		clientSocket3 = ioc("http://localhost:3000", { multiplex: false });
+		clientSocket4 = ioc("http://localhost:3000", { multiplex: false });
+		await waitFor(clientSocket, "connect");
+		await waitFor(clientSocket2, "connect");
+		await waitFor(clientSocket3, "connect");
+		await waitFor(clientSocket4, "connect");
+
+		const roomId = v4();
+		player1 = {
+			id: v4(),
+			roomId,
+			teamIndex: 0,
+			name: generateUsername(),
+			hand: []
+		};
+		player2 = {
+			id: v4(),
+			roomId,
+			teamIndex: 0,
+			name: generateUsername(),
+			hand: []
+		};
+		player3 = {
+			id: v4(),
+			roomId,
+			teamIndex: 1,
+			name: generateUsername(),
+			hand: []
+		};
+		player4 = {
+			id: v4(),
+			roomId,
+			teamIndex: 1,
+			name: generateUsername(),
+			hand: []
+		};
+		room = {
+			teams: [
+				{ players: [player1], id: 0 },
+				{ players: [], id: 1 }
+			],
+			id: roomId,
+			handsDealt: false
+		};
+		clientSocket.emit("create-room", room);
+
+		room.teams[0].players.push(player2);
+		let payload = { room, player: player2 } as ConnectionPayload;
+		clientSocket2.emit("connect-to-room", payload);
+
+		room.teams[1].players.push(player3);
+		payload = { room, player: player3 } as ConnectionPayload;
+		clientSocket3.emit("connect-to-room", payload);
+
+		room.teams[1].players.push(player4);
+		payload = { room, player: player4 } as ConnectionPayload;
+		clientSocket4.emit("connect-to-room", payload);
+	});
+
+	afterAll(() => {
+		io.close();
+		clientSocket.disconnect();
+		clientSocket2.disconnect();
+		clientSocket3.disconnect();
+		clientSocket4.disconnect();
+	});
+
+	it("should end a game after score hits 100, and end a rubber when a team wins two games", async () => {
+		room.teams[0].score = { aboveLine: 200, belowLine: 90 };
+		room.teams[1].score = { aboveLine: 300, belowLine: 70 };
+
+		room.gameIndex = 0;
+		room.rubberIndex = 0;
+
+		clientSocket.emit("check-game", room);
+		const res: Room = await waitFor(clientSocket, "game-checked");
+		expect(res.id).toBe(room.id);
+		expect(res.gameIndex).toBe(room.gameIndex);
+		expect(res.rubberIndex).toBe(room.rubberIndex);
+
+		//simulate winning a contract to push over 100
+		room.teams[0].score.belowLine += 20;
+		room.teams[0].score.aboveLine += 40;
+
+		clientSocket.emit("check-game", room);
+		const res2: Room = await waitFor(clientSocket, "game-checked");
+		expect(res2.id).toBe(room.id);
+		expect(res2.gameIndex).toBe(room.gameIndex! + 1);
+		expect(res2.rubberIndex).toBe(room.rubberIndex);
+		room = res2;
+
+		room.teams[0].score!.belowLine += 100;
+		clientSocket.emit("check-game", room);
+		const res3: Room = await waitFor(clientSocket, "game-checked");
+		expect(res3.id).toBe(room.id);
+		expect(res3.gameIndex).toBe(room.gameIndex! + 1);
+		room = res3;
+
+		clientSocket.emit("end-rubber", room);
+		const res4: Room = await waitFor(clientSocket, "rubber-ended");
+		res3.rubberIndex!++;
+		expect(res4).toStrictEqual(res3);
 	});
 });

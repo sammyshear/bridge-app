@@ -13,6 +13,7 @@ export interface Team {
 	players: Player[];
 	tricksWon?: number;
 	score?: Score;
+	gamesWon?: number;
 }
 
 export interface Score {
@@ -30,6 +31,8 @@ export interface Room {
 	declarer?: Player;
 	dummy?: Player;
 	handsDealt: boolean;
+	gameIndex?: number;
+	rubberIndex?: number;
 }
 
 export interface ConnectionPayload {
