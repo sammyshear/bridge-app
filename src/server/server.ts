@@ -117,7 +117,8 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 		},
 		"play-card": (data: PlayedCard) => {
 			const room = rooms.find((r: Room) => r.id === data.player.roomId)!;
-			if (room.currentTrick === undefined || room.currentTrick.length >= 4) room.currentTrick = [];
+			if (room.currentTrick === undefined || room.currentTrick.length >= 4)
+				room.currentTrick = [];
 			room.currentTrick.push(data);
 			io.to(room.id).emit("played-card", room);
 		},
@@ -131,7 +132,10 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 						winningCard = pCard;
 					}
 				} else {
-					if (pCard.card.num > winningCard.card.num && winningCard.card.suit !== data.currentTrump!) {
+					if (
+						pCard.card.num > winningCard.card.num &&
+						winningCard.card.suit !== data.currentTrump!
+					) {
 						winningCard = pCard;
 					}
 				}
@@ -142,18 +146,23 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 				winner: winningCard.player,
 				room: data
 			};
-			if (trick.room.teams[trick.winner.teamIndex].tricksWon === undefined) trick.room.teams[trick.winner.teamIndex].tricksWon = 0;
+			if (trick.room.teams[trick.winner.teamIndex].tricksWon === undefined)
+				trick.room.teams[trick.winner.teamIndex].tricksWon = 0;
 			trick.room.teams[trick.winner.teamIndex].tricksWon!++;
 			rooms[rooms.findIndex((r: Room) => r.id === data.id)] = trick.room;
 
 			io.to(data.id).emit("calculated-trick-winner", trick);
 		},
 		"end-contract": (data: Room) => {
+			console.log(data);
 			if (data.teams[data.declarer!.teamIndex].score === undefined) {
 				data.teams[data.declarer!.teamIndex].score = { belowLine: 0, aboveLine: 0 };
 			}
 			if (data.teams[data.declarer!.teamIndex === 0 ? 1 : 0].score === undefined) {
-				data.teams[data.declarer!.teamIndex === 0 ? 1 : 0].score = { belowLine: 0, aboveLine: 0 };
+				data.teams[data.declarer!.teamIndex === 0 ? 1 : 0].score = {
+					belowLine: 0,
+					aboveLine: 0
+				};
 			}
 			if (data.teams[data.declarer!.teamIndex].tricksWon! >= 6 + data.currentBid!.num) {
 				let addToBelow = 0;
@@ -161,28 +170,49 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 				switch (data.currentBid!.suit) {
 					case "Spades":
 						addToBelow = 30 * data.currentBid!.num;
-						addToAbove = 30 * (data.teams[data.declarer!.teamIndex].tricksWon! - data.currentBid!.num - 6);
+						addToAbove =
+							30 *
+							(data.teams[data.declarer!.teamIndex].tricksWon! -
+								data.currentBid!.num -
+								6);
 						break;
 					case "Hearts":
 						addToBelow = 30 * data.currentBid!.num;
-						addToAbove = 30 * (data.teams[data.declarer!.teamIndex].tricksWon! - data.currentBid!.num - 6);
+						addToAbove =
+							30 *
+							(data.teams[data.declarer!.teamIndex].tricksWon! -
+								data.currentBid!.num -
+								6);
 						break;
 					case "Diamonds":
 						addToBelow = 20 * data.currentBid!.num;
-						addToAbove = 20 * (data.teams[data.declarer!.teamIndex].tricksWon! - data.currentBid!.num - 6);
+						addToAbove =
+							20 *
+							(data.teams[data.declarer!.teamIndex].tricksWon! -
+								data.currentBid!.num -
+								6);
 						break;
 					case "Clubs":
 						addToBelow = 20 * data.currentBid!.num;
-						addToAbove = 20 * (data.teams[data.declarer!.teamIndex].tricksWon! - data.currentBid!.num - 6);
+						addToAbove =
+							20 *
+							(data.teams[data.declarer!.teamIndex].tricksWon! -
+								data.currentBid!.num -
+								6);
 						break;
 					case "NoTrump":
-						addToBelow = 40 + (30 * data.currentBid!.num);
-						addToAbove = 30 * (data.teams[data.declarer!.teamIndex].tricksWon! - data.currentBid!.num - 6);
+						addToBelow = 40 + 30 * data.currentBid!.num;
+						addToAbove =
+							30 *
+							(data.teams[data.declarer!.teamIndex].tricksWon! -
+								data.currentBid!.num -
+								6);
 						break;
 				}
 				data.teams[data.declarer!.teamIndex].score!.belowLine += addToBelow;
 				data.teams[data.declarer!.teamIndex].score!.aboveLine += addToAbove;
 			} else {
+				console.log(data.teams[data.declarer!.teamIndex === 0 ? 1 : 0].score);
 				data.teams[data.declarer!.teamIndex === 0 ? 1 : 0].score!.aboveLine += 100;
 			}
 
