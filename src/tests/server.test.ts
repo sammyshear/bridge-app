@@ -6,6 +6,7 @@ import { v4 } from "uuid";
 import type { ConnectionPayload, Player, Room } from "@/types/Room";
 import { generateUsername } from "unique-username-generator";
 import type { BidPayload, PlayedCard, PlayingCard, Trick } from "@/types/CardTypes";
+import { asyncForEach } from "@/util/Async";
 
 describe("socket.io connection tests", () => {
 	let io: Server,
@@ -273,13 +274,17 @@ describe("socket.io game logic tests", () => {
 		room = await waitFor(clientSocket, "bid-processed");
 
 		clientSocket.emit("finalize-bid", room);
+		room = await waitFor(clientSocket, "bid-finalized");
 
-		const card1: PlayedCard = { card: { num: 14, suit: "Spades", name: "Ace" }, player: player1 };
+		const card1: PlayedCard = {
+			card: { num: 14, suit: "Spades", name: "Ace" },
+			player: player1
+		};
 		const card2: PlayedCard = { card: { num: 2, suit: "Spades", name: 2 }, player: player2 };
 		const card3: PlayedCard = { card: { num: 7, suit: "Spades", name: 7 }, player: player3 };
 		const card4: PlayedCard = { card: { num: 3, suit: "Spades", name: 3 }, player: player4 };
 
-		clientSocket.emit("play-card", card1);	
+		clientSocket.emit("play-card", card1);
 		const res1: Room = await waitFor(clientSocket, "played-card");
 		expect(res1.currentTrick![0]).toStrictEqual(card1);
 		room = res1;
@@ -287,7 +292,7 @@ describe("socket.io game logic tests", () => {
 		clientSocket2.emit("play-card", card2);
 		const res2: Room = await waitFor(clientSocket, "played-card");
 		expect(res2.currentTrick![1]).toStrictEqual(card2);
-	
+
 		clientSocket3.emit("play-card", card3);
 		const res3: Room = await waitFor(clientSocket, "played-card");
 		expect(res3.currentTrick![2]).toStrictEqual(card3);
@@ -301,7 +306,127 @@ describe("socket.io game logic tests", () => {
 		clientSocket.emit("calculate-trick-winner", room);
 		const res5: Trick = await waitFor(clientSocket, "calculated-trick-winner");
 		expect(res5.trick).toStrictEqual(room.currentTrick);
+		expect(res5.room.teams[res5.winner.teamIndex].tricksWon).toBe(1);
 		expect(res5.winner).toStrictEqual(player1);
 		expect(res5.room.id).toBe(room.id);
+	});
+
+	it("should play a contract and score points (win)", async () => {
+		const bidPayload: BidPayload = { room, player: player1, bid: { suit: "Spades", num: 1 } };
+
+		clientSocket.emit("process-bid", bidPayload);
+		room = await waitFor(clientSocket, "bid-processed");
+
+		// client 3 will be left of client 1 at the table
+		const passPayload: BidPayload = { room, player: player3, bid: "Pass" };
+		clientSocket3.emit("process-bid", passPayload);
+		room = await waitFor(clientSocket, "bid-processed");
+
+		const bidPayload2: BidPayload = { room, player: player2, bid: { suit: "Spades", num: 2 } };
+		clientSocket2.emit("process-bid", bidPayload2);
+		room = await waitFor(clientSocket, "bid-processed");
+
+		passPayload.room = room;
+		passPayload.player = player4;
+		clientSocket4.emit("process-bid", passPayload);
+		room = await waitFor(clientSocket, "bid-processed");
+
+		clientSocket.emit("finalize-bid", room);
+
+		room = await waitFor(clientSocket, "bid-finalized");
+
+		player1.hand = [
+			{ suit: "Spades", num: 14, name: "Ace", points: 4 } as PlayingCard,
+			{ suit: "Spades", num: 13, name: "King", points: 3 } as PlayingCard,
+			{ suit: "Diamonds", num: 8, name: 8 } as PlayingCard,
+			{ suit: "Hearts", num: 9, name: 9 } as PlayingCard,
+			{ suit: "Spades", num: 6, name: 6 } as PlayingCard,
+			{ suit: "Spades", num: 3, name: 3 } as PlayingCard,
+			{ suit: "Clubs", num: 10, name: 10 } as PlayingCard,
+			{ suit: "Hearts", num: 14, name: "Ace", points: 4 } as PlayingCard,
+			{ suit: "Diamonds", num: 5, name: 5 } as PlayingCard,
+			{ suit: "Clubs", num: 11, name: "Jack", points: 1 } as PlayingCard,
+			{ suit: "Spades", num: 4, name: 4 } as PlayingCard,
+			{ suit: "Diamonds", num: 12, name: "Queen", points: 2 } as PlayingCard,
+			{ suit: "Hearts", num: 8, name: 8 } as PlayingCard
+		];
+
+		player2.hand = [
+			{ suit: "Spades", num: 5, name: 5 } as PlayingCard,
+			{ suit: "Spades", num: 7, name: 7 } as PlayingCard,
+			{ suit: "Diamonds", num: 4, name: 4 } as PlayingCard,
+			{ suit: "Hearts", num: 2, name: 2 } as PlayingCard,
+			{ suit: "Spades", num: 8, name: 8 } as PlayingCard,
+			{ suit: "Spades", num: 12, name: "Queen", points: 2 } as PlayingCard,
+			{ suit: "Clubs", num: 14, name: "Ace", points: 4 } as PlayingCard,
+			{ suit: "Spades", num: 10, name: 10 } as PlayingCard,
+			{ suit: "Clubs", num: 3, name: 3 } as PlayingCard,
+			{ suit: "Clubs", num: 9, name: 9 } as PlayingCard,
+			{ suit: "Clubs", num: 5, name: 5 } as PlayingCard,
+			{ suit: "Diamonds", num: 2, name: 2 } as PlayingCard,
+			{ suit: "Diamonds", num: 11, name: "Jack", points: 1 } as PlayingCard,
+		];
+
+		player3.hand = [
+			{ suit: "Spades", num: 2, name: 2 } as PlayingCard,
+			{ suit: "Spades", num: 11, name: "Jack", points: 1 } as PlayingCard,
+			{ suit: "Diamonds", num: 9, name: 9 } as PlayingCard,
+			{ suit: "Hearts", num: 5, name: 5 } as PlayingCard,
+			{ suit: "Clubs", num: 7, name: 7 } as PlayingCard,
+			{ suit: "Hearts", num: 7, name: 7 } as PlayingCard,
+			{ suit: "Hearts", num: 4, name: 4 } as PlayingCard,
+			{ suit: "Diamonds", num: 14, name: "Ace", points: 4 } as PlayingCard,
+			{ suit: "Hearts", num: 10, name: 10 } as PlayingCard,
+			{ suit: "Hearts", num: 3, name: 3 } as PlayingCard,
+			{ suit: "Diamonds", num: 10, name: 10 } as PlayingCard,
+			{ suit: "Clubs", num: 8, name: 8 } as PlayingCard,
+			{ suit: "Diamonds", num: 6, name: 6 } as PlayingCard
+		];
+
+		player4.hand = [
+			{ suit: "Spades", num: 9, name: 9 } as PlayingCard,
+			{ suit: "Diamonds", num: 7, name: 7 } as PlayingCard,
+			{ suit: "Hearts", num: 6, name: 6 } as PlayingCard,
+			{ suit: "Hearts", num: 11, name: "Jack", points: 1 } as PlayingCard,
+			{ suit: "Clubs", num: 13, name: "King", points: 3 } as PlayingCard,
+			{ suit: "Diamonds", num: 13, name: "King", points: 3 } as PlayingCard,
+			{ suit: "Clubs", num: 12, name: "Queen", points: 2 } as PlayingCard,
+			{ suit: "Hearts", num: 12, name: "Queen", points: 2 } as PlayingCard,
+			{ suit: "Diamonds", num: 3, name: 3 } as PlayingCard,
+			{ suit: "Hearts", num: 13, name: "King", points: 3 } as PlayingCard,
+			{ suit: "Clubs", num: 2, name: 2 } as PlayingCard,
+			{ suit: "Clubs", num: 4, name: 4 } as PlayingCard,
+			{ suit: "Clubs", num: 6, name: 6 } as PlayingCard
+		];
+
+		await asyncForEach<PlayingCard>(player1.hand, async (_: PlayingCard, i: number) => {
+			const card1: PlayedCard = { player: player1, card: player1.hand[i] };
+			const card2: PlayedCard = { player: player2, card: player2.hand[i] };
+			const card3: PlayedCard = { player: player3, card: player3.hand[i] };
+			const card4: PlayedCard = { player: player4, card: player4.hand[i] };
+
+			clientSocket.emit("play-card", card1);
+			room = await waitFor(clientSocket, "played-card");
+			clientSocket3.emit("play-card", card3);
+			room = await waitFor(clientSocket, "played-card");
+			clientSocket2.emit("play-card", card2);
+			room = await waitFor(clientSocket, "played-card");
+			clientSocket4.emit("play-card", card4);
+			room = await waitFor(clientSocket, "played-card");
+
+
+			clientSocket.emit("calculate-trick-winner", room);
+			const trick: Trick = await waitFor(clientSocket, "calculated-trick-winner");
+			room = trick.room;
+		});
+
+		clientSocket.emit("end-contract", room);
+		const res: Room = await waitFor(clientSocket, "ended-contract");
+		expect(res.id).toBe(room.id);
+		room = res;
+		expect(res.teams[0].score?.belowLine).toBe(60);
+		expect(res.teams[0].score?.aboveLine).toBe(90);
+		expect(res.teams[1].score?.aboveLine).toBe(0);
+		expect(res.teams[1].score?.belowLine).toBe(0);
 	});
 });

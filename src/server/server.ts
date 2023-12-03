@@ -1,4 +1,4 @@
-import type { BidPayload, CardPayload, PlayedCard, Trick } from "@/types/CardTypes";
+import type { BidPayload, PlayedCard, Trick } from "@/types/CardTypes";
 import type { ConnectionPayload, Player, Room } from "@/types/Room";
 import { dealHands } from "@/util/CardUtil";
 import { Server, Socket } from "socket.io";
@@ -112,11 +112,12 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 			data.dummy = data.teams[data.declarer!.teamIndex].players.find(
 				(p: Player) => p.id !== data.declarer!.id
 			);
+			rooms[rooms.findIndex((r: Room) => r.id === data.id)] = data;
 			io.to(data.id).emit("bid-finalized", data);
 		},
 		"play-card": (data: PlayedCard) => {
 			const room = rooms.find((r: Room) => r.id === data.player.roomId)!;
-			if (room.currentTrick === undefined) room.currentTrick = [];
+			if (room.currentTrick === undefined || room.currentTrick.length >= 4) room.currentTrick = [];
 			room.currentTrick.push(data);
 			io.to(room.id).emit("played-card", room);
 		},
@@ -124,18 +125,14 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 			const firstCardSuit = data.currentTrick![0].card.suit;
 			let winningCard: PlayedCard = data.currentTrick![0];
 
-			for (const card of data.currentTrick!) {
-				if (card.card.suit !== firstCardSuit) {
-					if (card.card.suit === data.currentTrump!) {
-						winningCard = card;
-					} else {
-						continue;
+			for (const pCard of data.currentTrick!) {
+				if (pCard.card.suit !== firstCardSuit) {
+					if (pCard.card.suit === data.currentTrump!) {
+						winningCard = pCard;
 					}
 				} else {
-					if (card.card.num > winningCard.card.num) {
-						winningCard = card;
-					} else {
-						continue;
+					if (pCard.card.num > winningCard.card.num && winningCard.card.suit !== data.currentTrump!) {
+						winningCard = pCard;
 					}
 				}
 			}
@@ -145,8 +142,51 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 				winner: winningCard.player,
 				room: data
 			};
+			if (trick.room.teams[trick.winner.teamIndex].tricksWon === undefined) trick.room.teams[trick.winner.teamIndex].tricksWon = 0;
+			trick.room.teams[trick.winner.teamIndex].tricksWon!++;
+			rooms[rooms.findIndex((r: Room) => r.id === data.id)] = trick.room;
 
 			io.to(data.id).emit("calculated-trick-winner", trick);
+		},
+		"end-contract": (data: Room) => {
+			if (data.teams[data.declarer!.teamIndex].score === undefined) {
+				data.teams[data.declarer!.teamIndex].score = { belowLine: 0, aboveLine: 0 };
+			}
+			if (data.teams[data.declarer!.teamIndex === 0 ? 1 : 0].score === undefined) {
+				data.teams[data.declarer!.teamIndex === 0 ? 1 : 0].score = { belowLine: 0, aboveLine: 0 };
+			}
+			if (data.teams[data.declarer!.teamIndex].tricksWon! >= 6 + data.currentBid!.num) {
+				let addToBelow = 0;
+				let addToAbove = 0;
+				switch (data.currentBid!.suit) {
+					case "Spades":
+						addToBelow = 30 * data.currentBid!.num;
+						addToAbove = 30 * (data.teams[data.declarer!.teamIndex].tricksWon! - data.currentBid!.num - 6);
+						break;
+					case "Hearts":
+						addToBelow = 30 * data.currentBid!.num;
+						addToAbove = 30 * (data.teams[data.declarer!.teamIndex].tricksWon! - data.currentBid!.num - 6);
+						break;
+					case "Diamonds":
+						addToBelow = 20 * data.currentBid!.num;
+						addToAbove = 20 * (data.teams[data.declarer!.teamIndex].tricksWon! - data.currentBid!.num - 6);
+						break;
+					case "Clubs":
+						addToBelow = 20 * data.currentBid!.num;
+						addToAbove = 20 * (data.teams[data.declarer!.teamIndex].tricksWon! - data.currentBid!.num - 6);
+						break;
+					case "NoTrump":
+						addToBelow = 40 + (30 * data.currentBid!.num);
+						addToAbove = 30 * (data.teams[data.declarer!.teamIndex].tricksWon! - data.currentBid!.num - 6);
+						break;
+				}
+				data.teams[data.declarer!.teamIndex].score!.belowLine += addToBelow;
+				data.teams[data.declarer!.teamIndex].score!.aboveLine += addToAbove;
+			} else {
+				data.teams[data.declarer!.teamIndex === 0 ? 1 : 0].score!.aboveLine += 100;
+			}
+
+			io.to(data.id).emit("ended-contract", data);
 		}
 	};
 
