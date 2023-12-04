@@ -1,14 +1,16 @@
 import { defineStore } from "pinia";
 import type { ConnectionPayload, ConnectionRoomPayload, Player, Room } from "@/types/Room";
 import { socket } from "@/socket";
+import type { PlayingCard } from "@/types/CardTypes";
 
 export const useRoomsStore = defineStore("rooms", {
   state: () => ({
     rooms: [] as Room[],
     player: {} as Player | undefined,
+    hand: [] as PlayingCard[] | undefined,
     curRoom: {} as Room | undefined,
     connected: false,
-    roomFull: false,
+    roomFull: false
   }),
 
   actions: {
@@ -24,6 +26,21 @@ export const useRoomsStore = defineStore("rooms", {
         this.rooms[this.rooms.findIndex((r: Room) => r.id === room.id)] = room;
         if (room.id === this.curRoom?.id) {
           this.roomFull = true;
+          socket.emit("deal-hands", room);
+        }
+      });
+
+      socket.on("hands-dealt", (room: Room) => {
+        this.rooms[this.rooms.findIndex((r: Room) => r.id === room.id)] = room;
+        if (room.id === this.curRoom?.id) {
+          this.curRoom = room;
+          this.player =
+            this.curRoom.teams[this.player!.teamIndex].players[
+            this.curRoom.teams[this.player!.teamIndex].players.findIndex(
+              (p: Player) => p.id === this.player!.id
+            )
+            ]!;
+          this.hand = this.player.hand;
         }
       });
 

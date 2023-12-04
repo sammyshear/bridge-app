@@ -5,8 +5,11 @@ import { useRoomsStore } from './stores/rooms';
 import type { Player } from './types/Room';
 import { generateUsername } from 'unique-username-generator';
 import { ref } from 'vue';
+import Hand from "./components/Hand.vue";
+import { storeToRefs } from 'pinia';
 
 const roomStore = useRoomsStore();
+const { player, curRoom, connected, hand } = storeToRefs(roomStore);
 
 socket.off();
 
@@ -24,7 +27,7 @@ const handleCreateConnect = () => {
 </script>
 
 <template>
-  <div class="modal" v-if="!roomStore.connected">
+  <div class="modal" v-if="!connected">
     <form @submit.prevent="handleCreateConnect" class="modal-content">
       <input type="text" v-model="roomId">
       <input type="range" :min="0" :max="1" v-model="teamIndex" id="teamRange">
@@ -36,8 +39,9 @@ const handleCreateConnect = () => {
       <button type="submit">{{picked}}</button>
     </form>
   </div>
-  <div class="game" v-if="roomStore.connected">
-    {{roomStore.curRoom?.id}}
+  <div class="game" v-if="connected">
+    {{curRoom!.id}}
+    <Hand hand-type="player" :hand="hand!" />
   </div>
 
 </template>
