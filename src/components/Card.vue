@@ -1,9 +1,9 @@
 <template>
   <div v-if="props.cardType">
-    <img :src="cardSrc" :alt="cardAlt" class="shown-card">
+    <img :src="cardSrc" :alt="cardAlt" :class="cardClass">
   </div>
   <div v-if="!props.cardType">
-    <img :src="CardBack" alt="Other player's card." class="hidden-card">
+    <img :src="CardBack" alt="Other player's card." :class="cardClass">
   </div>
 </template>
 
@@ -14,18 +14,20 @@ import CardBack from "@/assets/Card back 01.svg";
 
   const props = defineProps<{
     cardType: boolean,
-    card: PlayingCard
+    card?: PlayingCard,
+    cardHor: boolean;
   }>();
 
-  const cardSrc = loadCard(props.card);
-  const cardAlt = `${props.card.suit} of ${props.card.name}`;
+  const cardSrc = props.card ? loadCard(props.card) : CardBack;
+  const cardClass = props.cardHor ? "horizontal-card" : "vertical-card";
+  const cardAlt = `${props.card?.suit} of ${props.card?.name}`;
 </script>
 
 <style scoped lang="css">
-.shown-card {
+.horizontal-card {
   width: 5vw;
 }
-.hidden-card {
-  height: 6vh;
+.vertical-card {
+  height: 5vw;
 }
 </style>

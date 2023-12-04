@@ -6,10 +6,11 @@ import type { Player } from './types/Room';
 import { generateUsername } from 'unique-username-generator';
 import { ref } from 'vue';
 import Hand from "./components/Hand.vue";
+import Table from "./components/Table.vue";
 import { storeToRefs } from 'pinia';
 
 const roomStore = useRoomsStore();
-const { player, curRoom, connected, hand } = storeToRefs(roomStore);
+const { connected, hand } = storeToRefs(roomStore);
 
 socket.off();
 
@@ -17,6 +18,9 @@ roomStore.bindEvents();
 const roomId = ref<string>("");
 const teamIndex = ref<number>(0);
 const picked = ref<"Connect" | "Create">("Connect");
+const partnerHand = ref<Array<any>>(Array(13));
+const opponentHand1 = ref<Array<any>>(Array(13));
+const opponentHand2 = ref<Array<any>>(Array(13));
 
 const handleCreateConnect = () => {
   const player: Player = { teamIndex: teamIndex.value, id: v4(), roomId: roomId.value, name: generateUsername(), hand: []  };
@@ -40,11 +44,21 @@ const handleCreateConnect = () => {
     </form>
   </div>
   <div class="game" v-if="connected">
-    {{curRoom!.id}}
-    <Hand hand-type="player" :hand="hand!" />
+      <Hand hand-type="partner" :hand="partnerHand" />
+      <Hand hand-type="opponent" :hand="opponentHand1" />
+      <Table />
+      <Hand hand-type="player" :hand="hand!" />
+      <Hand hand-type="opponent" :hand="opponentHand2" />
   </div>
 
 </template>
 
-<style scoped>
+<style scoped lang="css">
+.game {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: 150px calc(100% - 300px) 150px;
+  grid-template-columns: 200px calc(100% - 400px) 200px;
+}
 </style>
