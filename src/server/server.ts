@@ -1,6 +1,6 @@
-import type { BidPayload, PlayedCard, Trick } from "@/types/CardTypes";
-import type { ConnectionPayload, Player, Room } from "@/types/Room";
-import { dealHands } from "@/util/CardUtil";
+import type { BidPayload, PlayedCard, Trick } from "../types/CardTypes";
+import type { ConnectionPayload, ConnectionRoomPayload, Player, Room } from "../types/Room";
+import { dealHands } from "../util/CardUtil";
 import { Server, Socket } from "socket.io";
 import type { Socket as ClientSocket } from "socket.io-client";
 
@@ -17,7 +17,7 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 		"create-room": (data: Room) => {
 			rooms.push(data);
 			socket.join(data.id);
-			socket.emit("room-created", data);
+			io.emit("room-created", data);
 		},
 		"delete-room": (data: Room) => {
 			rooms = rooms.filter((r: Room) => r.id !== data.id);
@@ -25,18 +25,31 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 			socket.leave(data.id);
 		},
 		"connect-to-room": (data: ConnectionPayload) => {
-			rooms[rooms.findIndex((r: Room) => r.id === data.room.id)] = data.room;
-			socket.join(data.room.id);
-			socket.emit("connected-to-room", data);
-			if (
-				data.room.teams.length === 2 &&
-				data.room.teams[0].players.length === 2 &&
-				data.room.teams[1].players.length === 2
-			) {
-				io.to(data.room.id).emit("room-full", data.room);
+			const room = rooms[rooms.findIndex((r: Room) => r.id === data.roomId)];
+			if (room !== undefined) {
+				if (room.teams[data.player.teamIndex] === undefined) {
+					room.teams[data.player.teamIndex] = { id: data.player.teamIndex, players: [] };
+				}
+				if (room.teams[data.player.teamIndex].players.length < 2) {
+					room.teams[data.player.teamIndex].players.push(data.player);
+					socket.join(data.roomId);
+					socket.emit("connected-to-room", {
+						room,
+						player: data.player
+					} as ConnectionRoomPayload);
+				} else {
+					socket.emit("team-full", data);
+				}
+				if (
+					room.teams.length === 2 &&
+					room.teams[0].players.length === 2 &&
+					room.teams[1].players.length === 2
+				) {
+					io.to(data.roomId).emit("room-full", room);
+				}
 			}
 		},
-		"disconnect-from-room": (data: ConnectionPayload) => {
+		"disconnect-from-room": (data: ConnectionRoomPayload) => {
 			rooms[rooms.findIndex((r: Room) => r.id === data.room.id)] = data.room;
 			socket.leave(data.room.id);
 			socket.emit("disconnected-from-room", data);
@@ -248,7 +261,7 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 
 			io.to(data.id).emit("game-checked", data);
 		},
-		"end-rubber": (data: Room) => {	
+		"end-rubber": (data: Room) => {
 			if (data.teams[0].gamesWon! === 2 || data.teams[1].gamesWon! === 2) {
 				data.rubberIndex!++;
 				io.to(data.id).emit("rubber-ended", data);
@@ -265,6 +278,8 @@ export async function setupServer(): Promise<{ io: Server; serverSocket: Socket 
 	const io = new Server(3000, { cors: { origin: "http://localhost:5173" } });
 
 	let serverSocket: Socket | undefined;
+
+	console.log("server listening on port 3000");
 
 	io.on("connection", (socket) => {
 		serverSocket = socket;

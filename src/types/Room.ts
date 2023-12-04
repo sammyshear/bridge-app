@@ -36,6 +36,11 @@ export interface Room {
 }
 
 export interface ConnectionPayload {
+	roomId: string;
+	player: Player;
+}
+
+export interface ConnectionRoomPayload {
 	room: Room;
 	player: Player;
 }

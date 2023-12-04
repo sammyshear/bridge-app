@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import type { ConnectionPayload, Player, Room } from "@/types/Room";
+import type { ConnectionPayload, ConnectionRoomPayload, Player, Room } from "@/types/Room";
 import { socket } from "@/socket";
 
 export const useRoomsStore = defineStore("rooms", {
@@ -7,7 +7,8 @@ export const useRoomsStore = defineStore("rooms", {
     rooms: [] as Room[],
     player: {} as Player | undefined,
     curRoom: {} as Room | undefined,
-    connected: false
+    connected: false,
+    roomFull: false,
   }),
 
   actions: {
@@ -19,7 +20,14 @@ export const useRoomsStore = defineStore("rooms", {
         }
       });
 
-      socket.on("connected-to-room", (payload: ConnectionPayload) => {
+      socket.on("room-full", (room: Room) => {
+        this.rooms[this.rooms.findIndex((r: Room) => r.id === room.id)] = room;
+        if (room.id === this.curRoom?.id) {
+          this.roomFull = true;
+        }
+      });
+
+      socket.on("connected-to-room", (payload: ConnectionRoomPayload) => {
         this.rooms[this.rooms.findIndex((r: Room) => r.id === payload.room.id)] =
           payload.room;
         if (this.player?.id === payload.player.id) {
@@ -28,12 +36,13 @@ export const useRoomsStore = defineStore("rooms", {
         }
       });
 
-      socket.on("disconnected-from-room", (payload: ConnectionPayload) => {
+      socket.on("disconnected-from-room", (payload: ConnectionRoomPayload) => {
         this.rooms[this.rooms.findIndex((r: Room) => r.id === payload.room.id)] =
           payload.room;
         if (this.player?.id === payload.player.id) {
           this.curRoom = undefined;
           this.connected = false;
+          this.roomFull = false;
         }
       });
 
@@ -43,6 +52,7 @@ export const useRoomsStore = defineStore("rooms", {
           this.curRoom = undefined;
           this.connected = false;
           this.player = undefined;
+          this.roomFull = false;
         }
       });
     },
@@ -58,13 +68,14 @@ export const useRoomsStore = defineStore("rooms", {
       socket.emit("delete-room", this.curRoom!);
     },
 
-    connectToRoom(room: Room, player: Player) {
-      const payload: ConnectionPayload = { room, player };
+    connectToRoom(roomId: string, player: Player) {
+      this.player = player;
+      const payload: ConnectionPayload = { roomId, player };
       socket.emit("connect-to-room", payload);
     },
 
     disconnectFromRoom() {
-      const payload: ConnectionPayload = { room: this.curRoom!, player: this.player! };
+      const payload: ConnectionRoomPayload = { room: this.curRoom!, player: this.player! };
       socket.emit("disconnect-from-room", payload);
     }
   }

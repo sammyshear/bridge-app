@@ -1,6 +1,6 @@
-import type { Room } from "@/types/Room";
-import type { PlayingCard as PlayingCard } from "@/types/CardTypes";
-import { deck } from "@/types/CardTypes";
+import type { Room } from "../types/Room";
+import type { PlayingCard as PlayingCard } from "../types/CardTypes";
+import { deck } from "../types/CardTypes";
 
 export function shuffle<T>(array: Array<T>): Array<T> {
   for (let i = array.length - 1; i > 0; i--) {

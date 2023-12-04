@@ -3,7 +3,7 @@ import { io as ioc, Socket as ClientSocket } from "socket.io-client";
 import { setupServer, waitFor } from "@/server/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { v4 } from "uuid";
-import type { ConnectionPayload, Player, Room } from "@/types/Room";
+import type { ConnectionPayload, ConnectionRoomPayload, Player, Room } from "@/types/Room";
 import { generateUsername } from "unique-username-generator";
 import type { BidPayload, PlayedCard, PlayingCard, Trick } from "@/types/CardTypes";
 import { asyncForEach } from "@/util/Async";
@@ -93,10 +93,11 @@ describe("socket.io connection tests", () => {
 		expect(res1).toStrictEqual(room);
 
 		room.teams[0].players.push(player2);
-		const payload = { room, player: player2 } as ConnectionPayload;
+		const payload = { roomId: room.id, player: player2 } as ConnectionPayload;
 		clientSocket2.emit("connect-to-room", payload);
-		const res2 = await waitFor(clientSocket2, "connected-to-room");
-		expect(res2).toStrictEqual(payload);
+		const res2: ConnectionRoomPayload = await waitFor(clientSocket2, "connected-to-room");
+		expect(res2.player).toStrictEqual(payload.player);
+		expect(res2.room.id).toBe(payload.roomId);
 	});
 });
 
@@ -164,16 +165,19 @@ describe("socket.io game logic tests", () => {
 		clientSocket.emit("create-room", room);
 
 		room.teams[0].players.push(player2);
-		let payload = { room, player: player2 } as ConnectionPayload;
+		let payload = { roomId: room.id, player: player2 } as ConnectionPayload;
 		clientSocket2.emit("connect-to-room", payload);
+		room = (await waitFor(clientSocket2, "connected-to-room")).room;
 
 		room.teams[1].players.push(player3);
-		payload = { room, player: player3 } as ConnectionPayload;
+		payload = { roomId: room.id, player: player3 } as ConnectionPayload;
 		clientSocket3.emit("connect-to-room", payload);
+		room = (await waitFor(clientSocket3, "connected-to-room")).room;
 
 		room.teams[1].players.push(player4);
-		payload = { room, player: player4 } as ConnectionPayload;
+		payload = { roomId: room.id, player: player4 } as ConnectionPayload;
 		clientSocket4.emit("connect-to-room", payload);
+		room = (await waitFor(clientSocket4, "connected-to-room")).room;
 	});
 
 	afterAll(() => {
@@ -614,16 +618,19 @@ describe("rubber testing", () => {
 		clientSocket.emit("create-room", room);
 
 		room.teams[0].players.push(player2);
-		let payload = { room, player: player2 } as ConnectionPayload;
+		let payload = { roomId: room.id, player: player2 } as ConnectionPayload;
 		clientSocket2.emit("connect-to-room", payload);
+		room = (await waitFor(clientSocket2, "connected-to-room")).room;
 
 		room.teams[1].players.push(player3);
-		payload = { room, player: player3 } as ConnectionPayload;
+		payload = { roomId: room.id, player: player3 } as ConnectionPayload;
 		clientSocket3.emit("connect-to-room", payload);
+		room = (await waitFor(clientSocket3, "connected-to-room")).room;
 
 		room.teams[1].players.push(player4);
-		payload = { room, player: player4 } as ConnectionPayload;
+		payload = { roomId: room.id, player: player4 } as ConnectionPayload;
 		clientSocket4.emit("connect-to-room", payload);
+		room = (await waitFor(clientSocket4, "connected-to-room")).room;
 	});
 
 	afterAll(() => {
