@@ -1,5 +1,11 @@
 import { defineStore } from "pinia";
-import type { ConnectionPayload, ConnectionRoomPayload, Player, Room } from "@/types/Room";
+import type {
+  ConnectionPayload,
+  ConnectionRoomPayload,
+  Player,
+  Room,
+  VotePayload
+} from "@/types/Room";
 import { socket } from "@/socket";
 import type { Bid, BidPayload, PlayedCard, PlayingCard, Trick } from "@/types/CardTypes";
 
@@ -10,7 +16,10 @@ export const useRoomsStore = defineStore("rooms", {
     hand: [] as PlayingCard[] | undefined,
     curRoom: {} as Room | undefined,
     connected: false,
-    roomFull: false
+    roomFull: false,
+    showRubberEnded: false,
+    continueVotes: 0,
+    endVotes: 0
   }),
 
   actions: {
@@ -75,6 +84,14 @@ export const useRoomsStore = defineStore("rooms", {
         }
       });
 
+      socket.on("rubber-ended", (r: Room) => {
+        this.rooms[this.rooms.findIndex((room: Room) => r.id === room.id)] = r;
+        if (r.id === this.curRoom?.id) {
+          this.curRoom = r;
+          this.showRubberEnded = true;
+        }
+      });
+
       socket.on("played-card", (r: Room) => {
         this.rooms[this.rooms.findIndex((room: Room) => room.id === r.id)] = r;
         if (r.id === this.curRoom?.id) {
@@ -84,9 +101,10 @@ export const useRoomsStore = defineStore("rooms", {
           }
         }
       });
-      
+
       socket.on("calculated-trick-winner", (trick: Trick) => {
-        this.rooms[this.rooms.findIndex((room: Room) => room.id === trick.room.id)] = trick.room;
+        this.rooms[this.rooms.findIndex((room: Room) => room.id === trick.room.id)] =
+          trick.room;
         if (trick.room.id === this.curRoom?.id) {
           this.curRoom = trick.room;
           this.curRoom.currentTrick!.length = 0;
@@ -118,7 +136,10 @@ export const useRoomsStore = defineStore("rooms", {
           this.curRoom.declarer = undefined;
           this.curRoom.dummy = undefined;
           socket.emit("deal-hands", this.curRoom);
-          if (this.curRoom.teams[0].gamesWon === 2 || this.curRoom.teams[1].gamesWon === 2) {
+          if (
+            this.curRoom.teams[0].gamesWon === 2 ||
+            this.curRoom.teams[1].gamesWon === 2
+          ) {
             socket.emit("end-rubber", this.curRoom);
           }
         }
@@ -130,11 +151,17 @@ export const useRoomsStore = defineStore("rooms", {
           this.curRoom = r;
           if (this.curRoom.playerWithBid!.id === this.curRoom.teams[0].players[0].id) {
             this.curRoom.playerWithBid = this.curRoom.teams[1].players[0];
-          } else if (this.curRoom.playerWithBid!.id === this.curRoom.teams[0].players[1].id) {
+          } else if (
+            this.curRoom.playerWithBid!.id === this.curRoom.teams[0].players[1].id
+          ) {
             this.curRoom.playerWithBid = this.curRoom.teams[1].players[1];
-          } else if (this.curRoom.playerWithBid!.id === this.curRoom.teams[1].players[0].id) {
+          } else if (
+            this.curRoom.playerWithBid!.id === this.curRoom.teams[1].players[0].id
+          ) {
             this.curRoom.playerWithBid = this.curRoom.teams[0].players[1];
-          } else if (this.curRoom.playerWithBid!.id === this.curRoom.teams[1].players[1].id) {
+          } else if (
+            this.curRoom.playerWithBid!.id === this.curRoom.teams[1].players[1].id
+          ) {
             this.curRoom.playerWithBid = this.curRoom.teams[0].players[0];
           }
         }
@@ -147,12 +174,28 @@ export const useRoomsStore = defineStore("rooms", {
           this.curRoom.playerWithBid = undefined;
         }
       });
-      
+
       socket.on("new-deal", (room: Room) => {
         this.rooms[this.rooms.findIndex((r: Room) => r.id === room.id)] = room;
         if (room.id === this.curRoom?.id) {
           this.curRoom = room;
           socket.emit("deal-hands", room);
+        }
+      });
+
+      socket.on("vote-received", (vote: VotePayload) => {
+        this.endVotes = vote.endVotes;
+        this.continueVotes = vote.continueVotes;
+        if (this.endVotes > 2) {
+          this.endVotes = 0;
+          this.continueVotes = 0;
+          this.deleteRoom();
+        } else if (this.continueVotes === 4) {
+          this.endVotes = 0;
+          this.continueVotes = 0;
+          this.curRoom!.teams[0].score = undefined;
+          this.curRoom!.teams[1].score = undefined;
+          this.showRubberEnded = false;
         }
       });
     },
@@ -206,6 +249,26 @@ export const useRoomsStore = defineStore("rooms", {
       ] = this.player!;
       const playedCard: PlayedCard = { card, player: this.player! };
       socket.emit("play-card", playedCard);
+    },
+
+    voteEnd() {
+      this.endVotes++;
+      const vote: VotePayload = {
+        endVotes: this.endVotes,
+        continueVotes: this.continueVotes,
+        roomId: this.curRoom!.id
+      };
+      socket.emit("end-vote", vote);
+    },
+
+    voteContinue() {
+      this.continueVotes++;
+      const vote: VotePayload = {
+        endVotes: this.endVotes,
+        continueVotes: this.continueVotes,
+        roomId: this.curRoom!.id
+      };
+      socket.emit("end-vote", vote);
     }
   }
 });

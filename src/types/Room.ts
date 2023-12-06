@@ -47,3 +47,9 @@ export interface ConnectionRoomPayload {
 	room: Room;
 	player: Player;
 }
+
+export interface VotePayload {
+	endVotes: number;
+	roomId: string;
+	continueVotes: number;
+}

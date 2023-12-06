@@ -1,5 +1,5 @@
 import type { BidPayload, PlayedCard, Trick } from "../types/CardTypes";
-import type { ConnectionPayload, ConnectionRoomPayload, Player, Room } from "../types/Room";
+import type { ConnectionPayload, ConnectionRoomPayload, Player, Room, VotePayload } from "../types/Room";
 import { dealHands } from "../util/CardUtil";
 import { Server, Socket } from "socket.io";
 import type { Socket as ClientSocket } from "socket.io-client";
@@ -309,6 +309,9 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 				data.rubberIndex!++;
 				io.to(data.id).emit("rubber-ended", data);
 			}
+		},
+		"vote": (data: VotePayload) => {
+			io.to(data.roomId).emit("vote-received", data);
 		}
 	};
 

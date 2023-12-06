@@ -11,6 +11,18 @@
         <button type="submit">Bid</button>
       </form>
     </div>
+    <div class="modal" v-if="showRubberEnded">
+      <form class="modal-content" @submit.prevent="handleVote">
+        <h6>Rubber Ended</h6>
+        Votes to Continue: {{continueVotes}}
+        Votes to End: {{endVotes}}
+        <input type="radio" v-model="picked" id="continue" value="Continue">
+        <label for="continue">Continue</label>
+        <input type="radio" v-model="picked" id="end" value="End">
+        <label for="end">End</label>
+        <button type="submit">Vote to {{picked}}</button>
+      </form>
+    </div>
     <div class="info">
       <table>
         <thead>
@@ -53,12 +65,13 @@ import { ref, watch } from "vue";
 import type { Score } from "@/types/Room";
 
 const store = useRoomsStore();
-const { curRoom, player } = storeToRefs(store);
+const { curRoom, player, showRubberEnded, continueVotes, endVotes } = storeToRefs(store);
 const curSuit = ref<TrumpSuit>();
 const curNum = ref<number>(1);
 const curTrick = ref<PlayedCard[]>([]);
 const score1 = ref<Score>();
 const score2 = ref<Score>();
+const picked = ref<"Continue" | "End">("Continue");
 
 const suits: TrumpSuit[] = ["Spades", "Hearts", "Diamonds", "Clubs", "NoTrump"];
 
@@ -69,9 +82,18 @@ const handleBid = () => {
   let bid: Bid = { suit: curSuit.value!, num: curNum.value! };
   store.bid(bid);
 };
+
 const handlePass = () => {
   store.sendPass();
 };
+
+const handleVote = () => {
+  if (picked.value === "End") {
+    store.voteEnd();
+  } else {
+    store.voteContinue()
+  }
+}
 
 watch(curRoom, (newRoom, _) => {
   canBid.value = newRoom!.playerWithBid?.id === player.value!.id;
