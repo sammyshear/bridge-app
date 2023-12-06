@@ -33,6 +33,9 @@ export interface Room {
 	handsDealt: boolean;
 	gameIndex?: number;
 	rubberIndex?: number;
+	playerWithTurn?: Player;
+	playerWithBid?: Player;
+	numPassed?: number;
 }
 
 export interface ConnectionPayload {

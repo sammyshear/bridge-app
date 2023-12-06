@@ -75,6 +75,7 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 						) {
 							data.room.currentBid = data.bid;
 						}
+						break;
 					case "Hearts":
 						if (data.bid.num > data.room.currentBid.num) {
 							data.room.currentBid = data.bid;
@@ -84,6 +85,7 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 						) {
 							data.room.currentBid = data.bid;
 						}
+						break;
 					case "Diamonds":
 						if (data.bid.num > data.room.currentBid.num) {
 							data.room.currentBid = data.bid;
@@ -95,6 +97,7 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 						) {
 							data.room.currentBid = data.bid;
 						}
+						break;
 					case "Clubs":
 						if (data.bid.num > data.room.currentBid.num) {
 							data.room.currentBid = data.bid;
@@ -107,10 +110,12 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 						) {
 							data.room.currentBid = data.bid;
 						}
+						break;
 					case "NoTrump":
 						if (data.bid.num > data.room.currentBid.num) {
 							data.room.currentBid = data.bid;
 						}
+						break;
 				}
 				if (data.room.declarer !== undefined) {
 					if (data.room.declarer.teamIndex !== data.player.teamIndex) {
@@ -121,10 +126,24 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 			io.to(data.room.id).emit("bid-processed", data.room);
 		},
 		"finalize-bid": (data: Room) => {
+			if (data.currentBid === undefined) {
+				console.log("too many passes, new deal");
+				data.numPassed = 0;
+				data.handsDealt = false;
+				io.to(data.id).emit("new-deal", data);
+				return;
+			}
 			data.currentTrump = data.currentBid!.suit;
 			data.dummy = data.teams[data.declarer!.teamIndex].players.find(
 				(p: Player) => p.id !== data.declarer!.id
 			);
+			data.playerWithTurn =
+				data.teams[data.declarer!.teamIndex === 0 ? 1 : 0].players[
+				data.teams[data.declarer!.teamIndex].players.findIndex(
+					(p: Player) => p.id !== data.declarer!.id
+				)
+				];
+			data.playingTeam = data.teams[data.declarer!.teamIndex];
 			rooms[rooms.findIndex((r: Room) => r.id === data.id)] = data;
 			io.to(data.id).emit("bid-finalized", data);
 		},
@@ -133,6 +152,28 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 			if (room.currentTrick === undefined || room.currentTrick.length >= 4)
 				room.currentTrick = [];
 			room.currentTrick.push(data);
+			room.teams[data.player.teamIndex].players[
+				room.teams[data.player.teamIndex].players.findIndex(
+					(p: Player) => p.id === data.player.id
+				)
+			] = data.player;
+			if (room.playerWithTurn!.id === room.declarer!.id) {
+				room.declarer!.hand =
+					room.teams[room.declarer!.teamIndex].players[
+						room.teams[room.declarer!.teamIndex].players.findIndex(
+							(p: Player) => p.id === room.declarer!.id
+						)
+					].hand;
+			}
+			if (room.playerWithTurn!.id === room.teams[0].players[0].id) {
+				room.playerWithTurn = room.teams[1].players[0];
+			} else if (room.playerWithTurn!.id === room.teams[1].players[0].id) {
+				room.playerWithTurn = room.teams[0].players[1];
+			} else if (room.playerWithTurn!.id === room.teams[0].players[1].id) {
+				room.playerWithTurn = room.teams[1].players[1];
+			} else if (room.playerWithTurn!.id === room.teams[1].players[1].id) {
+				room.playerWithTurn = room.teams[0].players[0];
+			}
 			io.to(room.id).emit("played-card", room);
 		},
 		"calculate-trick-winner": (data: Room) => {
@@ -162,6 +203,8 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 			if (trick.room.teams[trick.winner.teamIndex].tricksWon === undefined)
 				trick.room.teams[trick.winner.teamIndex].tricksWon = 0;
 			trick.room.teams[trick.winner.teamIndex].tricksWon!++;
+			trick.room.playerWithTurn = trick.winner;
+			trick.room.playingTeam = trick.room.teams[trick.room.declarer!.teamIndex];
 			rooms[rooms.findIndex((r: Room) => r.id === data.id)] = trick.room;
 
 			io.to(data.id).emit("calculated-trick-winner", trick);

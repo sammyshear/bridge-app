@@ -1,9 +1,7 @@
 <template>
-  <div v-if="props.cardType">
-    <img :src="cardSrc" :alt="cardAlt" :class="cardClass">
-  </div>
-  <div v-if="!props.cardType">
-    <img :src="CardBack" alt="Other player's card." :class="cardClass">
+  <div class="card">
+    <img :src="cardSrc" :alt="cardAlt" :class="cardClass" v-if="props.cardType">
+    <img :src="CardBack" alt="Other player's card." :class="cardClass" v-if="!props.cardType">
   </div>
 </template>
 
