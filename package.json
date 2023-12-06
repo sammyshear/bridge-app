@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"vite\" \"tsx watch src/server\"",
+    "start": "tsx watch src/server",
+    "dev": "concurrently \"vite\" \"pnpm run start\"",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "test:unit": "vitest",

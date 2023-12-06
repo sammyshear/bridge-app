@@ -321,7 +321,8 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 }
 
 export async function setupServer(): Promise<{ io: Server; serverSocket: Socket | undefined }> {
-	const io = new Server(3000, { cors: { origin: "http://localhost:5173" } });
+	const port: number = parseInt(process.env.PORT || "3000");
+	const io = new Server(port);
 
 	let serverSocket: Socket | undefined;
 
