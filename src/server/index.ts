@@ -1,4 +1,6 @@
 import { setupServer } from "./server";
-import "dotenv/config";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 setupServer();
