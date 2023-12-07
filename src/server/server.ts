@@ -326,7 +326,7 @@ export async function setupServer(): Promise<{ io: Server; serverSocket: Socket 
 
 	let serverSocket: Socket | undefined;
 
-	console.log("server listening on port 3000");
+	console.log(`server listening on port ${port}`);
 
 	io.on("connection", (socket) => {
 		serverSocket = socket;
