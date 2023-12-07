@@ -322,7 +322,8 @@ export function handleSocketEvents(io: Server, socket: Socket) {
 
 export async function setupServer(): Promise<{ io: Server; serverSocket: Socket | undefined }> {
 	const port: number = parseInt(process.env.PORT || "3000");
-	const io = new Server(port);
+	const corsOrigin: string = process.env.NODE_ENV === "production" ? "https://bridge.sshear.dev" : "http://localhost:5173"; 
+	const io = new Server(port, { cors: { origin: corsOrigin } });
 
 	let serverSocket: Socket | undefined;
 
