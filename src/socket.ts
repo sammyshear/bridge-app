@@ -7,7 +7,7 @@ export const state = reactive({
   players: []
 });
 
-const URL = process.env.NODE_ENV === "production" ? "https://bridge-socket.sshear.dev" : "http://localhost:3000";
+const URL = process.env.NODE_ENV === "production" ? "https://bridge.sshear.dev" : "http://localhost:3000";
 
 export const socket: Socket = io(URL);
 

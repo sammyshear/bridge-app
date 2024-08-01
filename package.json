@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "start": "tsx watch src/server",
+    "serve": "concurrently \"serve -s dist -p 5173\" \"pnpm run start\"",
     "dev": "concurrently \"vite\" \"pnpm run start\"",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
@@ -15,6 +16,7 @@
   },
   "dependencies": {
     "pinia": "^2.1.7",
+    "serve": "^14.2.3",
     "socket.io": "^4.7.2",
     "socket.io-client": "^4.7.2",
     "unique-username-generator": "^1.2.0",
@@ -49,5 +51,6 @@
   },
   "_moduleAliases": {
     "@": "src"
-  }
+  },
+  "packageManager": "pnpm@9.6.0+sha512.38dc6fba8dba35b39340b9700112c2fe1e12f10b17134715a4aa98ccf7bb035e76fd981cf0bb384dfa98f8d6af5481c2bef2f4266a24bfa20c34eb7147ce0b5e"
 }
